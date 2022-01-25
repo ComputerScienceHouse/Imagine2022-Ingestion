@@ -62,6 +62,8 @@ async fn async_main() -> BoxResult<()> {
                     timestamp: timestamp.as_millis() as u64,
                 };
 
+                println!("Received bluetooth frame - {:?}", bluetooth_frame);
+
                 let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
 
                 if result.is_err() {

@@ -1,7 +1,8 @@
-use std::env;
+use mongodb::bson::doc;
 use mongodb::options::ClientOptions;
 use mongodb::Client;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::UdpSocket;
 use tokio::runtime::Runtime;
@@ -39,6 +40,11 @@ async fn async_main() -> BoxResult<()> {
     let client = Client::with_options(client_options)?;
 
     let database = client.database("develop");
+
+    database.run_command(doc!("ping": 1), None).await?;
+
+    println!("Connected to mongo database.");
+
     let bluetooth_frames = database.collection::<BluetoothFrame>("bluetooth_frames");
 
     let socket = UdpSocket::bind("0.0.0.0:8080").await?;
@@ -66,11 +72,16 @@ async fn async_main() -> BoxResult<()> {
 
                 let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
 
-                if result.is_err() {
-                    println!(
-                        "Failed to save bluetooth frame to database - {:?}",
-                        bluetooth_frame
-                    );
+                match result {
+                    Ok(_) => {
+                        println!("Saved bluetooth frame.");
+                    }
+                    Err(_) => {
+                        println!(
+                            "Failed to save bluetooth frame to database - {:?}",
+                            bluetooth_frame
+                        );
+                    }
                 }
             }
             Err(error) => {

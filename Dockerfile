@@ -1,10 +1,10 @@
 FROM rust
 
-RUN git clone https://github.com/josephbgerber/ingestion
-WORKDIR ingestion
-RUN cargo build
+WORKDIR /ingestion
+COPY . .
+RUN cargo build --release
 
 FROM debian
-# TODO: Change to not debug :P
-COPY --from=0 /ingestion/target/debug/ingestion ./
+EXPOSE 8080
+COPY --from=0 /ingestion/target/release/ingestion ./
 CMD ["./ingestion"]

@@ -12,7 +12,7 @@ echo 'MONGO_URL=mongodb://some_mongo' > .env
 
 Then, run the container with this command:
 ```
-podman run --rm -d --name=imagine2022-ingestion --network some-network --env-file=.env imagine2022-ingestion
+podman run --rm -d --name=imagine2022-ingestion -p 8080:8080 --env-file=.env imagine2022-ingestion
 ```
 
 The container should now be running.

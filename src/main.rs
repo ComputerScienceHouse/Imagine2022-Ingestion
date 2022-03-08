@@ -26,12 +26,19 @@ struct BluetoothFrame {
 }
 
 fn main() -> BoxResult<()> {
+    ctrlc::set_handler(move || {
+        println!("received Ctrl+C!");
+        std::process::exit(0);
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let runtime = Runtime::new()?;
     runtime.block_on(async_main())?;
     Ok(())
 }
 
 async fn async_main() -> BoxResult<()> {
+    println!("Booting ingestion server...");
     let mongo_url = env::var("MONGO_URL")?;
 
     let mut client_options = ClientOptions::parse(mongo_url).await?;

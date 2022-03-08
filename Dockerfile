@@ -2,6 +2,7 @@ FROM rust
 
 WORKDIR /ingestion
 COPY . .
+RUN cargo fetch
 RUN cargo build --release
 
 FROM debian

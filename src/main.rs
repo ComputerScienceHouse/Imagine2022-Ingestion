@@ -1,5 +1,5 @@
 use mongodb::bson::doc;
-use mongodb::options::ClientOptions;
+use mongodb::options::{ClientOptions, Tls};
 use mongodb::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -38,15 +38,17 @@ fn main() -> BoxResult<()> {
 }
 
 async fn async_main() -> BoxResult<()> {
+    dotenv::dotenv().ok();
     println!("Booting ingestion server...");
     let mongo_url = env::var("MONGO_URL")?;
 
     let mut client_options = ClientOptions::parse(mongo_url).await?;
     client_options.app_name = Some("Sentinel Surveillance".to_string());
+    client_options.tls = Some(Tls::Enabled(Default::default()));
 
     let client = Client::with_options(client_options)?;
 
-    let database = client.database("develop");
+    let database = client.database("imagine2022");
 
     database.run_command(doc!("ping": 1), None).await?;
 

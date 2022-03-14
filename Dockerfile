@@ -1,5 +1,4 @@
 FROM rust
-
 WORKDIR /ingestion
 COPY . .
 RUN cargo fetch

@@ -1,3 +1,4 @@
 /target
+/mongo_data
 .idea
 .env

@@ -2,7 +2,19 @@
 
 Build the container with `podman build . --tag=imagine2022-ingestion`
 
-Then, spin up a MongoDB. Could be a container, or some other deployment (I tested with a container).
+Then, spin up a MongoDB. Could be a container, or some other deployment (I tested with a container). Use `run_mongo.sh`.
+
+To add credentials, do the following:
+```
+use develop;
+db.createUser(
+  {
+    user: "imaginerit",
+    pwd:  "ligma123",
+    roles: [ { role: "dbOwner", db: "develop" } ]
+  }
+);
+```
 
 Write a `MONGO_URL` into a `.env` file.
 

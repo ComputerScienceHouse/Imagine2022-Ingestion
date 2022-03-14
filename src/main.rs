@@ -14,20 +14,20 @@ type BoxResult<T> = Result<T, BoxError>;
 struct BluetoothFrameWithoutTimestamp {
     macaddr: String,
     uename: String,
-    rssi: f64,
+    rssi: i32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BluetoothFrame {
     macaddr: String,
     uename: String,
-    rssi: f64,
+    rssi: i32,
     timestamp: u64,
 }
 
 fn main() -> BoxResult<()> {
     ctrlc::set_handler(move || {
-        println!("received Ctrl+C!");
+        println!("\nReceived Ctrl+C!");
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
@@ -79,20 +79,14 @@ async fn async_main() -> BoxResult<()> {
 
     loop {
         let (len, _address) = socket.recv_from(&mut buffer).await?;
-
-        let bluetooth_frame =
-            serde_json::from_slice::<BluetoothFrameWithoutTimestamp>(&buffer[0..len]);
-
-        match bluetooth_frame {
-            Ok(bluetooth_frame) => {
-                let now = SystemTime::now();
-                let timestamp = now.duration_since(UNIX_EPOCH).unwrap();
-
+        let frame = match std::str::from_utf8(&buffer) {
+            Ok(frame) => {
+                let frame_vec: Vec<&str> = frame.split("|").collect();
                 let bluetooth_frame = BluetoothFrame {
-                    macaddr: bluetooth_frame.macaddr,
-                    uename: bluetooth_frame.uename,
-                    rssi: bluetooth_frame.rssi,
-                    timestamp: timestamp.as_millis() as u64,
+                    macaddr: frame_vec[3].to_string(),
+                    uename: frame_vec[2].to_string(),
+                    rssi: frame_vec[4].parse::<i32>().unwrap(), // This might panic. I've seen this come out of order.
+                    timestamp: frame_vec[1].parse::<u64>().unwrap()
                 };
 
                 println!("Received bluetooth frame - {:?}", bluetooth_frame);
@@ -110,10 +104,8 @@ async fn async_main() -> BoxResult<()> {
                         );
                     }
                 }
-            }
-            Err(error) => {
-                println!("Invalid message received - {:?}", error);
-            }
-        }
+            },
+            Err(e) => eprintln!("Invalid UTF-8 sequence: {}", e),
+        };
     }
 }

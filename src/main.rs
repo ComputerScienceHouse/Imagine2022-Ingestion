@@ -10,13 +10,6 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type BoxResult<T> = Result<T, BoxError>;
 
 #[derive(Serialize, Deserialize, Debug)]
-struct BluetoothFrameWithoutTimestamp {
-    macaddr: String,
-    uename: String,
-    rssi: i32,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 struct BluetoothFrame {
     macaddr: String,
     uename: String,

@@ -53,33 +53,34 @@ async fn async_main() -> BoxResult<()> {
     println!("Serving on {}", &socket_address);
     loop {
         let (_len, _address) = socket.recv_from(&mut buffer).await?;
-        match std::str::from_utf8(&buffer) {
-            Ok(frame) => {
-                let frame_vec: Vec<&str> = frame.split("|").collect();
-                let bluetooth_frame = BluetoothFrame {
-                    macaddr: frame_vec[3].to_string(),
-                    uename: frame_vec[2].to_string(),
-                    rssi: frame_vec[4].parse::<i32>().unwrap(), // This might panic. I've seen this come out of order.
-                    timestamp: frame_vec[1].parse::<u64>().unwrap()
-                };
-
-                println!("Received bluetooth frame - {:?}", bluetooth_frame);
-
-                let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
-
-                match result {
-                    Ok(_) => {
-                        println!("Saved bluetooth frame.");
-                    }
-                    Err(_) => {
-                        println!(
-                            "Failed to save bluetooth frame to database - {:?}",
-                            bluetooth_frame
-                        );
-                    }
+        let frame = parse_frame(&buffer);
+        if let Some(bluetooth_frame) = frame {
+            println!("{:?}", bluetooth_frame);
+            let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
+            match result {
+                Ok(_) => println!("Saved bluetooth frame."),
+                Err(_) => {
+                    println!(
+                        "Failed to save bluetooth frame to database - {:?}",
+                        bluetooth_frame
+                    );
                 }
-            },
-            Err(e) => eprintln!("Invalid UTF-8 sequence: {}", e),
-        };
+            }
+        } else {
+            eprintln!("Could not parse bluetooth frame.");
+        }
     }
+}
+
+fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
+    let frame_string = std::str::from_utf8(&buffer).ok()?;
+    let frame_vec: Vec<&str> = frame_string.split("|").collect();
+    let parsed_frame = BluetoothFrame {
+        macaddr: frame_vec[3].to_string(),
+        uename: frame_vec[2].to_string(),
+        rssi: frame_vec[4].parse::<i32>().ok()?,
+        timestamp: frame_vec[1].parse::<u64>().ok()?
+    };
+    Some(parsed_frame)
+
 }

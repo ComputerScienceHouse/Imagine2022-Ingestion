@@ -3,7 +3,6 @@ use mongodb::options::{ClientOptions, Tls};
 use mongodb::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::net::UdpSocket;
 use tokio::runtime::Runtime;
 
@@ -40,11 +39,7 @@ fn main() -> BoxResult<()> {
 async fn async_main() -> BoxResult<()> {
     dotenv::dotenv().ok();
     println!("Booting ingestion server...");
-    let mongo_url = match env::var("MONGO_URL") {
-        Ok(url) => url,
-        _ => panic!("MONGO_URL variable not specified. Please specify the MongoDB's URL in this format: mongodb://user:password@some_mongo"),
-    };
-
+    let mongo_url = env::var("MONGO_URL").expect("MONGO_URL variable not specified. Please specify the MongoDB's URL in this format: mongodb://user:password@some_mongo");
     let mut client_options = ClientOptions::parse(mongo_url).await?;
     client_options.app_name = Some("Sentinel Surveillance".to_string());
     match env::var("TLS") {
@@ -54,32 +49,18 @@ async fn async_main() -> BoxResult<()> {
         },
         _ => println!("TLS Disabled"),
     }
-
     let client = Client::with_options(client_options)?;
-
-    let database = match env::var("DATABASE") {
-        Ok(db_name) => client.database(&db_name),
-        _ => panic!("DATABASE variable not specified. Please specify DATABASE name."),
-    };
+    let database = client.database(&env::var("DATABASE").expect("DATABASE variable not specified. Please specify DATABASE name."));
     database.run_command(doc!("ping": 1), None).await?;
-
     println!("Connected to mongo database.");
-
     let bluetooth_frames = database.collection::<BluetoothFrame>("bluetooth_frames");
-
-    let socket_address = match env::var("SERVER_ADDRESS") {
-        Ok(addr) => addr,
-        _ => panic!("SERVER_ADDRESS variable not specified. Please specify the server's address and port. (eg 0.0.0.0:8080)"),
-    };
-
+    let socket_address = env::var("SERVER_ADDRESS").expect("SERVER_ADDRESS variable not specified. Please specify the server's address and port. (eg 0.0.0.0:8080)");
     let socket = UdpSocket::bind(&socket_address).await?;
     let mut buffer = [0; 1024];
-
     println!("Serving on {}", &socket_address);
-
     loop {
-        let (len, _address) = socket.recv_from(&mut buffer).await?;
-        let frame = match std::str::from_utf8(&buffer) {
+        let (_len, _address) = socket.recv_from(&mut buffer).await?;
+        match std::str::from_utf8(&buffer) {
             Ok(frame) => {
                 let frame_vec: Vec<&str> = frame.split("|").collect();
                 let bluetooth_frame = BluetoothFrame {

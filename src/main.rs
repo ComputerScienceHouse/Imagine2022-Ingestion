@@ -48,6 +48,7 @@ async fn async_main() -> BoxResult<()> {
     println!("Connected to mongo database.");
     let bluetooth_frames = database.collection::<BluetoothFrame>("bluetooth_frames");
     let socket_address = env::var("SERVER_ADDRESS").expect("SERVER_ADDRESS variable not specified. Please specify the server's address and port. (eg 0.0.0.0:8080)");
+    println!("Waiting for socket to bind...");
     let socket = UdpSocket::bind(&socket_address).await?;
     let mut buffer = [0; 1024];
     println!("Serving on {}", &socket_address);

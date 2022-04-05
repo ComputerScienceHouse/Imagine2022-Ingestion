@@ -59,7 +59,7 @@ async fn async_main() -> BoxResult<()> {
             println!("{:?}", bluetooth_frame);
             let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
             match result {
-                Ok(_) => println!("Saved bluetooth frame."),
+                Ok(_) => (),
                 Err(_) => {
                     println!(
                         "Failed to save bluetooth frame to database - {:?}",

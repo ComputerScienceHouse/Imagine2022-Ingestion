@@ -11,6 +11,7 @@ type BoxResult<T> = Result<T, BoxError>;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BluetoothFrame {
+    sniffaddr: String,
     macaddr: String,
     uename: String,
     rssi: i32,
@@ -77,6 +78,7 @@ fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
     let frame_string = std::str::from_utf8(&buffer).ok()?;
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
     let parsed_frame = BluetoothFrame {
+        sniffaddr: frame_vec[0].to_string(),
         macaddr: frame_vec[3].to_string(),
         uename: frame_vec[2].to_string(),
         rssi: frame_vec[4].parse::<i32>().ok()?,

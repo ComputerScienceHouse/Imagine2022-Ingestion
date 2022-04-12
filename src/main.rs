@@ -52,22 +52,36 @@ async fn async_main() -> BoxResult<()> {
     let socket = UdpSocket::bind(&socket_address).await?;
     let mut buffer = [0; 1024];
     println!("Serving on {}", &socket_address);
+    let allow_any = match env::var("ALLOW_ANY_ADDRESS") {
+        Ok(allow) => match allow.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => panic!("ALLOW_ANY_ADDRESS variable not specified."),
+        },
+        _ => panic!("ALLOW_ANY_ADDRESS variable not specified."),
+    };
+
     loop {
         let (_len, _address) = socket.recv_from(&mut buffer).await?;
         let frame = parse_frame(&buffer);
         if let Some(bluetooth_frame) = frame {
-            println!("{:?}", bluetooth_frame);
-            let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
-            match result {
-                Ok(_) => (),
-                Err(_) => {
-                    println!(
-                        "Failed to save bluetooth frame to database - {:?}",
-                        bluetooth_frame
-                    );
+            // Only publish frames that are from our devices.
+            if (bluetooth_frame.macaddr.to_ascii_lowercase().contains("be:ef:34:25:69:") &&
+                bluetooth_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:")) ||
+                allow_any {
+                let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
+                match result {
+                    Ok(_) => (),
+                    Err(_) => {
+                        println!(
+                            "Failed to save bluetooth frame to database - {:?}",
+                            bluetooth_frame
+                        );
+                    }
                 }
+                println!("{:?}", bluetooth_frame);
             }
-        } else {
+        } else if !allow_any {
             eprintln!("Could not parse bluetooth frame.");
         }
     }
@@ -76,10 +90,6 @@ async fn async_main() -> BoxResult<()> {
 fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
     let frame_string = std::str::from_utf8(&buffer).ok()?;
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
-    if !frame_vec[2].to_string().contains("BE:EF:34:25:69:") {
-        return None;
-    }
-
     let parsed_frame = BluetoothFrame {
         sniffaddr: frame_vec[0].to_string(),
         macaddr: frame_vec[2].to_string(),

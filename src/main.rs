@@ -76,6 +76,10 @@ async fn async_main() -> BoxResult<()> {
 fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
     let frame_string = std::str::from_utf8(&buffer).ok()?;
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
+    if !frame_vec[2].to_string().contains("BE:EF:34:25:69:") {
+        return None;
+    }
+
     let parsed_frame = BluetoothFrame {
         sniffaddr: frame_vec[0].to_string(),
         macaddr: frame_vec[2].to_string(),

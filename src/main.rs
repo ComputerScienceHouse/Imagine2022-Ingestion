@@ -13,7 +13,6 @@ type BoxResult<T> = Result<T, BoxError>;
 struct BluetoothFrame {
     sniffaddr: String,
     macaddr: String,
-    uename: String,
     rssi: i32,
     timestamp: u64,
 }
@@ -79,9 +78,8 @@ fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
     let parsed_frame = BluetoothFrame {
         sniffaddr: frame_vec[0].to_string(),
-        macaddr: frame_vec[3].to_string(),
-        uename: frame_vec[2].to_string(),
-        rssi: frame_vec[4].parse::<i32>().ok()?,
+        macaddr: frame_vec[2].to_string(),
+        rssi: frame_vec[3].parse::<i32>().ok()?,
         timestamp: frame_vec[1].parse::<u64>().ok()?
     };
     Some(parsed_frame)

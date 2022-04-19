@@ -101,6 +101,7 @@ async fn async_main() -> BoxResult<()> {
                         );
                     }
                 }
+                println!("{:?}", heartbeat_frame);
             }
         } else if !allow_any {
             eprintln!("Could not parse bluetooth frame.");
@@ -124,8 +125,8 @@ fn parse_heartbeat(buffer: &[u8]) -> Option<HeartbeatFrame> {
     let frame_string = std::str::from_utf8(&buffer).ok()?;
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
     let parsed_frame = HeartbeatFrame {
-        sniffaddr: frame_vec[0].to_string(),
-        timestamp: frame_vec[1].parse::<u64>().ok()?
+        sniffaddr: frame_vec[1].to_string(),
+        timestamp: frame_vec[2].parse::<u64>().ok()?
     };
     Some(parsed_frame)
 }

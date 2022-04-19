@@ -17,6 +17,12 @@ struct BluetoothFrame {
     timestamp: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct HeartbeatFrame {
+    sniffaddr: String,
+    timestamp: u64,
+}
+
 fn main() -> BoxResult<()> {
     ctrlc::set_handler(move || {
         println!("\nReceived Ctrl+C!");
@@ -47,6 +53,7 @@ async fn async_main() -> BoxResult<()> {
     database.run_command(doc!("ping": 1), None).await?;
     println!("Connected to mongo database.");
     let bluetooth_frames = database.collection::<BluetoothFrame>("bluetooth_frames");
+    let heartbeat_frames = database.collection::<HeartbeatFrame>("heartbeat_frames");
     let socket_address = env::var("SERVER_ADDRESS").expect("SERVER_ADDRESS variable not specified. Please specify the server's address and port. (eg 0.0.0.0:8080)");
     println!("Waiting for socket to bind...");
     let socket = UdpSocket::bind(&socket_address).await?;
@@ -64,10 +71,11 @@ async fn async_main() -> BoxResult<()> {
     loop {
         let (_len, _address) = socket.recv_from(&mut buffer).await?;
         let frame = parse_frame(&buffer);
+        let heartbeat = parse_heartbeat(&buffer);
         if let Some(bluetooth_frame) = frame {
             // Only publish frames that are from our devices.
-            if (bluetooth_frame.macaddr.to_ascii_lowercase().contains("be:ef:34:25:69:") &&
-                bluetooth_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:")) ||
+            if (bluetooth_frame.macaddr.to_ascii_lowercase().contains("be:ef:34:25:69:") && // Tags
+                bluetooth_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:")) || // Sniffers
                 allow_any {
                 let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
                 match result {
@@ -80,6 +88,19 @@ async fn async_main() -> BoxResult<()> {
                     }
                 }
                 println!("{:?}", bluetooth_frame);
+            }
+        } else if let Some(heartbeat_frame) = heartbeat {
+            if heartbeat_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:") { // Sniffers
+                let result = heartbeat_frames.insert_one(&heartbeat_frame, None).await;
+                match result {
+                    Ok(_) => (),
+                    Err(_) => {
+                        println!(
+                            "Failed to save heartbeat frame to database - {:?}",
+                            heartbeat_frame
+                        );
+                    }
+                }
             }
         } else if !allow_any {
             eprintln!("Could not parse bluetooth frame.");
@@ -97,5 +118,14 @@ fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
         timestamp: frame_vec[1].parse::<u64>().ok()?
     };
     Some(parsed_frame)
+}
 
+fn parse_heartbeat(buffer: &[u8]) -> Option<HeartbeatFrame> {
+    let frame_string = std::str::from_utf8(&buffer).ok()?;
+    let frame_vec: Vec<&str> = frame_string.split("|").collect();
+    let parsed_frame = HeartbeatFrame {
+        sniffaddr: frame_vec[0].to_string(),
+        timestamp: frame_vec[1].parse::<u64>().ok()?
+    };
+    Some(parsed_frame)
 }

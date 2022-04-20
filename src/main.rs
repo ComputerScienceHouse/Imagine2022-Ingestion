@@ -10,6 +10,12 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type BoxResult<T> = Result<T, BoxError>;
 
 #[derive(Serialize, Deserialize, Debug)]
+enum Frame {
+    Bluetooth (BluetoothFrame),
+    Heartbeat (HeartbeatFrame),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct BluetoothFrame {
     sniffaddr: String,
     macaddr: String,
@@ -29,7 +35,6 @@ fn main() -> BoxResult<()> {
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
-
     let runtime = Runtime::new()?;
     runtime.block_on(async_main())?;
     Ok(())
@@ -71,62 +76,74 @@ async fn async_main() -> BoxResult<()> {
     loop {
         let (_len, _address) = socket.recv_from(&mut buffer).await?;
         let frame = parse_frame(&buffer);
-        let heartbeat = parse_heartbeat(&buffer);
-        if let Some(bluetooth_frame) = frame {
-            // Only publish frames that are from our devices.
-            if (bluetooth_frame.macaddr.to_ascii_lowercase().contains("be:ef:34:25:69:") && // Tags
-                bluetooth_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:")) || // Sniffers
-                allow_any {
-                let result = bluetooth_frames.insert_one(&bluetooth_frame, None).await;
-                match result {
-                    Ok(_) => (),
-                    Err(_) => {
-                        println!(
-                            "Failed to save bluetooth frame to database - {:?}",
-                            bluetooth_frame
-                        );
+        match frame {
+            Some(Frame::Bluetooth(frame)) => {
+                // Only publish frames that are from our devices.
+                if (frame.macaddr.to_ascii_lowercase().contains("be:ef:34:25:69:") && // Tags
+                    frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:")) || // Sniffers
+                    allow_any {
+                    let result = bluetooth_frames.insert_one(&frame, None).await; // ???
+                    match result {
+                        Ok(_) => {
+                            println!("{:?}", frame);
+                        },
+                        Err(_) => {
+                            println!(
+                                "Failed to save bluetooth frame to database - {:?}",
+                                frame
+                            );
+                        }
                     }
                 }
-                println!("{:?}", bluetooth_frame);
-            }
-        } else if let Some(heartbeat_frame) = heartbeat {
-            if heartbeat_frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:") { // Sniffers
-                let result = heartbeat_frames.insert_one(&heartbeat_frame, None).await;
-                match result {
-                    Ok(_) => (),
-                    Err(_) => {
-                        println!(
-                            "Failed to save heartbeat frame to database - {:?}",
-                            heartbeat_frame
-                        );
+            },
+            Some(Frame::Heartbeat(frame)) => {
+                if frame.sniffaddr.to_ascii_lowercase().contains("ca:fe:69:c5:11:") { // Sniffers
+                    let result = heartbeat_frames.insert_one(&frame, None).await;
+                    match result {
+                        Ok(_) => {
+                            println!("{:?}", frame);
+                        },
+                        Err(_) => {
+                            println!(
+                                "Failed to save heartbeat frame to database - {:?}",
+                                frame
+                            );
+                        }
                     }
                 }
-                println!("{:?}", heartbeat_frame);
-            }
-        } else if !allow_any {
-            eprintln!("Could not parse bluetooth frame.");
+            },
+            _ => {
+                eprintln!("Could not parse bluetooth frame.");
+            },
         }
     }
 }
 
-fn parse_frame(buffer: &[u8]) -> Option<BluetoothFrame> {
+fn parse_frame(buffer: &[u8]) -> Option<Frame> {
     let frame_string = std::str::from_utf8(&buffer).ok()?;
     let frame_vec: Vec<&str> = frame_string.split("|").collect();
-    let parsed_frame = BluetoothFrame {
-        sniffaddr: frame_vec[0].to_string(),
-        macaddr: frame_vec[2].to_string(),
-        rssi: frame_vec[3].parse::<i32>().ok()?,
-        timestamp: frame_vec[1].parse::<u64>().ok()?
-    };
-    Some(parsed_frame)
-}
-
-fn parse_heartbeat(buffer: &[u8]) -> Option<HeartbeatFrame> {
-    let frame_string = std::str::from_utf8(&buffer).ok()?;
-    let frame_vec: Vec<&str> = frame_string.split("|").collect();
-    let parsed_frame = HeartbeatFrame {
-        sniffaddr: frame_vec[1].to_string(),
-        timestamp: frame_vec[2].parse::<u64>().ok()?
-    };
-    Some(parsed_frame)
+    match frame_vec[0] {
+        "heartbeat" => {
+            let frame_string = std::str::from_utf8(&buffer).ok()?;
+            let frame_vec: Vec<&str> = frame_string.split("|").collect();
+            let parsed_frame = Frame::Heartbeat (
+				HeartbeatFrame {
+                    sniffaddr: frame_vec[1].to_string(),
+                    timestamp: frame_vec[2].parse::<u64>().ok()?
+                }
+            );
+            Some(parsed_frame)
+        },
+        _ => {
+            let parsed_frame = Frame::Bluetooth (
+				BluetoothFrame{
+                    sniffaddr: frame_vec[0].to_string(),
+                    macaddr: frame_vec[2].to_string(),
+                    rssi: frame_vec[3].parse::<i32>().ok()?,
+                    timestamp: frame_vec[1].parse::<u64>().ok()?
+				}
+            );
+            Some(parsed_frame)
+        }
+    }
 }

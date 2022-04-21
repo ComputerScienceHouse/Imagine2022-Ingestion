@@ -76,7 +76,6 @@ async fn async_main() -> BoxResult<()> {
     loop {
         let (_len, _address) = socket.recv_from(&mut buffer).await?;
         let frame = parse_frame(&buffer);
-        println!("Got frame.");
         match frame {
             Some(Frame::Bluetooth(frame)) => {
                 // Only publish frames that are from our devices.
